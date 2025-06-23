@@ -1,8 +1,27 @@
+
+# --- IMPORTANT: Install Dependencies First ---
+# Before running this Streamlit application, ensure you have all required libraries installed.
+# You can do this by creating a 'requirements.txt' file in the same directory as this script
+# with the following content:
+#
+# streamlit
+# pandas
+# Pillow
+# joblib
+# scikit-learn
+#
+# Then, open your terminal or command prompt, navigate to this directory, and run:
+# pip install -r requirements.txt
+# ---------------------------------------------
+
 import streamlit as st
 import pandas as pd
-from PIL import Image # PIL is used for image handling, though not directly for the logo upload in the Streamlit version
+from PIL import Image
 import joblib
 import os
+import random # Used in the original data generation logic, kept for completeness
+import numpy as np # Used in the original data generation logic, kept for completeness
+from datetime import datetime, timedelta # Used in the original data generation logic, kept for completeness
 
 # --- Configuration and Data Loading ---
 # IMPORTANT: For this Streamlit app to run, you need to place the following files
@@ -37,13 +56,13 @@ def load_ml_model():
 borrowers, loans, payments = load_all_data()
 loaded_model = load_ml_model()
 
-# --- Global Mappings for Categorical Features ---
+# --- Global Mappings for Categorical Features (from training data) ---
 # These mappings are crucial and MUST be consistent with how the model was trained.
-# We are assuming 'borrowers' DataFrame contains the necessary columns for creating these maps.
-# If your model was trained using a different DataFrame (e.g., a combined one),
-# you should load that specific DataFrame here to derive the mappings.
+# They are derived from the loaded 'borrowers' DataFrame.
 try:
     # Ensure these columns exist in your borrowers_data.csv
+    # The original Gradio code had 'df' which was undefined for these mappings.
+    # We assume 'borrowers' DataFrame contains the necessary columns for creating these maps.
     sector_map = {k: v for v, k in enumerate(borrowers['sector'].astype('category').cat.categories)}
     region_map = {k: v for v, k in enumerate(borrowers['region'].astype('category').cat.categories)}
     income_bracket_map = {k: v for v, k in enumerate(borrowers['income_bracket'].astype('category').cat.categories)}
@@ -54,45 +73,129 @@ except KeyError as e:
              "or adjust the mapping source if your model was trained with different data.")
     st.stop()
 
+# --- Comprehensive Lists and Risk Logic (extracted from your data generation code) ---
+
+# Job Titles and Risk Mapping
+ALL_JOB_TITLES = [
+    "Engineer", "Accountant", "Retail Manager", "Doctor", "Trader", "Laborer",
+    "Nurse", "Technician", "Electrician", "Plumber", "Construction Worker",
+    "Driver", "Teacher", "Professor", "IT Specialist", "Software Developer",
+    "Civil Engineer", "Mechanical Engineer", "Electrical Engineer",
+    "Architect", "Project Manager", "Site Supervisor", "HR Manager",
+    "Sales Representative", "Customer Service Agent", "Warehouse Worker",
+    "Security Guard", "Cleaner", "Chef", "Waiter", "Barista",
+    "Pharmacist", "Radiologist", "Dentist", "Surgeon", "Financial Analyst",
+    "Legal Advisor", "Bank Teller", "Operations Manager", "Procurement Officer",
+    "Administrative Assistant", "Receptionist", "Marketing Specialist",
+    "Content Creator", "Logistics Coordinator", "Supply Chain Manager"
+]
+
+HIGH_RISK_JOBS = [
+    "Laborer", "Construction Worker", "Cleaner", "Waiter", "Barista",
+    "Driver", "Security Guard", "Warehouse Worker", "Retail Manager",
+    "Sales Representative", "Customer Service Agent", "Chef", "Trader",
+    "Technician", "Administrative Assistant", "Receptionist", "Content Creator"
+]
+
+def is_high_risk_job_func(job_title):
+    return job_title in HIGH_RISK_JOBS
+
+JOB_SECTOR_MAP = {
+    "Engineer": "Industrial", "Accountant": "Services", "Retail Manager": "Retail",
+    "Doctor": "Services", "Trader": "Retail", "Laborer": "Industrial",
+    "Nurse": "Services", "Technician": "Industrial", "Electrician": "Industrial",
+    "Plumber": "Industrial", "Construction Worker": "Industrial", "Driver": "Services",
+    "Teacher": "Services", "Professor": "Services", "IT Specialist": "Tech",
+    "Software Developer": "Tech", "Civil Engineer": "Industrial", "Mechanical Engineer": "Industrial",
+    "Electrical Engineer": "Industrial", "Architect": "Industrial", "Project Manager": "Services",
+    "Site Supervisor": "Industrial", "HR Manager": "Services", "Sales Representative": "Retail",
+    "Customer Service Agent": "Services", "Warehouse Worker": "Industrial", "Security Guard": "Services",
+    "Cleaner": "Services", "Chef": "Services", "Waiter": "Services", "Barista": "Retail",
+    "Pharmacist": "Services", "Radiologist": "Services", "Dentist": "Services", "Surgeon": "Services",
+    "Financial Analyst": "Services", "Legal Advisor": "Services", "Bank Teller": "Services",
+    "Operations Manager": "Services", "Procurement Officer": "Industrial", "Administrative Assistant": "Services",
+    "Receptionist": "Services", "Marketing Specialist": "Services", "Content Creator": "Tech",
+    "Logistics Coordinator": "Industrial", "Supply Chain Manager": "Industrial"
+}
+
+# Nationality and Risk Mapping
+ALL_NATIONALITIES = [
+    "Bangladesh", "India", "Pakistan", "Nepal", "Sri Lanka", "Indonesia",
+    "Philippines", "Yemen", "Egypt", "Sudan", "Syria", "Jordan", "Lebanon",
+    "Morocco", "Palestine", "Tunisia", "Libya", "Mauritania", "Oman",
+    "Qatar", "Bahrain", "Kuwait", "Ethiopia", "Eritrea", "Kenya", "Nigeria",
+    "Ghana", "Cameroon", "Uganda", "Senegal", "China", "Malaysia", "Thailand",
+    "Myanmar", "Cambodia", "Japan", "South Korea", "USA", "UK", "Canada",
+    "Australia", "Germany", "France", "Italy", "Spain", "Brazil", "Argentina",
+    "Iran", "South Sudan", "Mozambique", "Tanzania" # Ensure high-risk ones are also selectable
+]
+
+HIGH_RISK_NATIONALITIES = [
+    "Iran", "Myanmar", "Yemen", "Syria", "Lebanon", "Sudan", "South Sudan",
+    "Nigeria", "Cameroon", "Senegal", "Mozambique", "Tanzania", "Philippines", "Ethiopia"
+]
+
+def is_high_risk_nationality_func(nationality):
+    return nationality in HIGH_RISK_NATIONALITIES
+
+# Country of Residence and Risk Mapping
+ALL_COUNTRIES_OF_RESIDENCE = [
+    "KSA", "UAE", "Egypt",
+    "Iran", "Myanmar", "Yemen", "Syria", "Lebanon", "Sudan", "South Sudan",
+    "Nigeria", "Cameroon", "Senegal", "Mozambique", "Tanzania", "Philippines", "Ethiopia" # Ensure high-risk ones are also selectable
+]
+
+HIGH_RISK_COUNTRIES_OF_RESIDENCE = [
+    "Iran", "Myanmar", "Yemen", "Syria", "Lebanon", "Sudan", "South Sudan",
+    "Nigeria", "Cameroon", "Senegal", "Mozambique", "Tanzania", "Philippines", "Ethiopia"
+]
+
+def is_high_risk_country_func(country_residence):
+    return country_residence in HIGH_RISK_COUNTRIES_OF_RESIDENCE
+
+# Other Options
+# Combine sectors from JOB_SECTOR_MAP values and the generate_sector function's choices
+# This ensures all possible sectors are available, even if not all are in the loaded 'borrowers' data.
+ALL_SECTORS = sorted(list(set(JOB_SECTOR_MAP.values()) | set(["Retail", "Services", "Tech", "Industrial"])))
+ALL_REGIONS = ["Central", "Eastern", "Western", "Southern"]
+ALL_INCOME_BRACKETS = ["Low", "Medium", "High"]
+ALL_GENDERS = ["Male", "Female"]
+
+
 # === Helper Functions (adapted for Streamlit) ===
-# These functions interact with the loaded DataFrames
 def get_all_borrower_ids():
     return borrowers['borrower_id'].tolist()
 
 def get_loans_for_borrower(borrower_id):
     borrower_loans = loans[loans['borrower_id'] == borrower_id]
     if borrower_loans.empty:
-        return "No loans found for this borrower."
-    return borrower_loans.to_string(index=False)
+        return pd.DataFrame() # Return empty DataFrame for no loans
+    return borrower_loans
 
 def get_borrower_details(borrower_id):
     borrower_info = borrowers[borrowers['borrower_id'] == borrower_id]
     if borrower_info.empty:
-        return "Borrower not found."
-    return borrower_info.to_string(index=False)
+        return pd.DataFrame() # Return empty DataFrame for not found
+    return borrower_info
 
 def get_payments_for_loan(loan_id):
     loan_payments = payments[payments['loan_id'] == loan_id]
     if loan_payments.empty:
-        return "No payments found for this loan."
-    return loan_payments.to_string(index=False)
+        return pd.DataFrame() # Return empty DataFrame for no payments
+    return loan_payments
 
 def get_payment_delay_possibility(loan_id):
-    # Make a copy to avoid SettingWithCopyWarning
     loan_payments = payments[payments['loan_id'] == loan_id].copy()
 
     if loan_payments.empty:
         return "No payment data to assess delay possibility."
 
-    # Merge with loan and borrower info to get all necessary features
     loan_payments = loan_payments.merge(loans, on="loan_id", how="left").merge(borrowers, on="borrower_id", how="left")
 
-    # Preprocessing steps, consistent with model training
     loan_payments['payment_date'] = pd.to_datetime(loan_payments['payment_date'], errors='coerce')
     loan_payments['due_date'] = pd.to_datetime(loan_payments['due_date'], errors='coerce')
     loan_payments['delay_days'] = (loan_payments['payment_date'] - loan_payments['due_date']).dt.days
     loan_payments['delay_days'] = loan_payments['delay_days'].fillna(0).astype(int)
-    # 'payment_delayed' is the target variable, not used for prediction input
     loan_payments['payment_delayed'] = (loan_payments['delay_days'] > 2).astype(int)
 
     # Apply categorical mappings
@@ -101,12 +204,10 @@ def get_payment_delay_possibility(loan_id):
     loan_payments['income_bracket'] = loan_payments['income_bracket'].map(income_bracket_map).fillna(-1)
     loan_payments['gender'] = loan_payments['gender'].map(gender_map).fillna(-1)
 
-    # Define features used by the model
     features = ['age', 'is_high_risk_nationality', 'is_high_risk_country',
                 'is_high_risk_job', 'principal', 'apr', 'sector',
                 'region', 'income_bracket', 'gender']
 
-    # Check if all required features are present in the processed DataFrame
     if not all(col in loan_payments.columns for col in features):
         missing_cols = [col for col in features if col not in loan_payments.columns]
         return f"Missing required features for prediction: {', '.join(missing_cols)}. " \
@@ -117,7 +218,6 @@ def get_payment_delay_possibility(loan_id):
     if loaded_model is None:
         return "Model not loaded. Cannot predict delay possibility."
 
-    # Get predictions and probabilities for each payment
     predictions = loaded_model.predict(input_data)
     probabilities = loaded_model.predict_proba(input_data)
 
@@ -125,17 +225,16 @@ def get_payment_delay_possibility(loan_id):
     for i, row in input_data.iterrows():
         payment_status = "Delayed" if predictions[i] == 1 else "On-time"
         probability_delayed = probabilities[i][1]
-        # Safely get due_date for display
         due_date_display = loan_payments.loc[i, 'due_date'].date() if pd.notna(loan_payments.loc[i, 'due_date']) else "N/A"
         results.append(f"Payment due {due_date_display}: Predicted {payment_status} (Probability of Delay: {probability_delayed:.2f})")
 
     return "\n".join(results)
 
-def predict_delay(age, nationality_risk, residence_risk, job_risk, amount, apr, sector_val, region_val, income_bracket_val, gender_val):
-    # Convert risk strings to 0/1 for model input
-    is_high_risk_nationality = 1 if nationality_risk == "High Risk" else 0
-    is_high_risk_country = 1 if residence_risk == "High Risk" else 0
-    is_high_risk_job = 1 if job_risk == "High Risk" else 0
+def predict_delay(age, nationality, residence, job_title, amount, apr, sector_val, region_val, income_bracket_val, gender_val):
+    # Determine risk flags based on selected strings using the defined functions
+    is_high_risk_nationality = 1 if is_high_risk_nationality_func(nationality) else 0
+    is_high_risk_country = 1 if is_high_risk_country_func(residence) else 0
+    is_high_risk_job = 1 if is_high_risk_job_func(job_title) else 0
 
     input_dict = {
         'age': age,
@@ -162,7 +261,6 @@ def predict_delay(age, nationality_risk, residence_risk, job_risk, amount, apr, 
                 'is_high_risk_job', 'principal', 'apr', 'sector',
                 'region', 'income_bracket', 'gender']
 
-    # Check if all required features are present after mapping
     if not all(col in input_df.columns for col in features):
         missing_cols = [col for col in features if col not in input_df.columns]
         return f"Missing required features for prediction: {', '.join(missing_cols)}. " \
@@ -185,12 +283,8 @@ st.set_page_config(page_title="Loan Management Dashboard", layout="wide")
 # Header Section with Logo and Title
 col1, col2 = st.columns([1, 3])
 with col1:
-    # Streamlit doesn't have a direct interactive image upload for a logo like Gradio.
-    # You can use st.file_uploader to allow users to upload, then st.image to display.
-    # For simplicity, using a placeholder image or a static image path.
-    # If you have a company logo file (e.g., 'logo.png'), you can use:
-    # st.image("logo.png", width=100)
-    st.image("https://via.placeholder.com/100x100.png?text=Company+Logo", width=100 ) # Placeholder
+    # Placeholder for company logo. You can replace this with st.image("your_logo.png")
+    st.image("https://via.placeholder.com/100x100.png?text=Company+Logo", width=100)
 with col2:
     st.markdown("## Loan Management & Delay Prediction System")
 
@@ -199,18 +293,27 @@ tab1, tab2 = st.tabs(["Data Explorer", "Single Loan Prediction"])
 
 with tab1:
     st.header("Data Explorer")
-    # Sub-tabs within Data Explorer
     subtab1_1, subtab1_2 = st.tabs(["Borrower/Loan Overview", "Payment Details & Delay Possibility"])
 
     with subtab1_1:
         st.subheader("Borrower/Loan Overview")
         borrower_ids = get_all_borrower_ids()
-        # Use a unique key for each selectbox to prevent issues with multiple widgets
         selected_borrower_id = st.selectbox("Select Borrower ID", options=borrower_ids, key="borrower_select_tab1")
 
         if selected_borrower_id:
-            st.text_area("Borrower Details", value=get_borrower_details(selected_borrower_id), height=150)
-            st.text_area("Loans for this Borrower", value=get_loans_for_borrower(selected_borrower_id), height=150)
+            st.markdown("#### Borrower Details")
+            borrower_details_df = get_borrower_details(selected_borrower_id)
+            if not borrower_details_df.empty:
+                st.dataframe(borrower_details_df, use_container_width=True)
+            else:
+                st.write("Borrower not found.")
+
+            st.markdown("#### Loans for this Borrower")
+            borrower_loans_df = get_loans_for_borrower(selected_borrower_id)
+            if not borrower_loans_df.empty:
+                st.dataframe(borrower_loans_df, use_container_width=True)
+            else:
+                st.write("No loans found for this borrower.")
 
     with subtab1_2:
         st.subheader("Payment Details & Delay Possibility")
@@ -218,31 +321,38 @@ with tab1:
         selected_loan_id = st.selectbox("Select Loan ID", options=loan_ids, key="loan_select_tab1")
 
         if selected_loan_id:
-            st.text_area("Payments for this Loan", value=get_payments_for_loan(selected_loan_id), height=150)
-            st.text_area("Payment Delay Possibility", value=get_payment_delay_possibility(selected_loan_id), height=150)
+            st.markdown("#### Payments for this Loan")
+            loan_payments_df = get_payments_for_loan(selected_loan_id)
+            if not loan_payments_df.empty:
+                st.dataframe(loan_payments_df, use_container_width=True)
+            else:
+                st.write("No payments found for this loan.")
+
+            st.markdown("#### Payment Delay Possibility")
+            delay_possibility_text = get_payment_delay_possibility(selected_loan_id)
+            st.text_area("Prediction for each payment:", value=delay_possibility_text, height=150)
+
 
 with tab2:
     st.header("Single Loan Prediction")
     st.markdown("### Enter details to predict likelihood of payment delay")
 
-    # Options for risk-related dropdowns (simplified for demonstration)
-    risk_options = ["Not High Risk", "High Risk"]
+    # Use comprehensive lists for dropdowns
+    sector_options = ALL_SECTORS
+    region_options = ALL_REGIONS
+    income_bracket_options = ALL_INCOME_BRACKETS
+    gender_options = ALL_GENDERS
+    nationality_options = ALL_NATIONALITIES
+    residence_options = ALL_COUNTRIES_OF_RESIDENCE
+    job_title_options = ALL_JOB_TITLES
 
-    # Get actual categories from the loaded data for other dropdowns
-    sector_options = list(sector_map.keys())
-    region_options = list(region_map.keys())
-    income_bracket_options = list(income_bracket_map.keys())
-    gender_options = list(gender_map.keys())
-
-    # Use columns for a two-column layout for prediction inputs
     col_pred1, col_pred2 = st.columns(2)
 
     with col_pred1:
         age = st.slider("Age", min_value=20, max_value=60, value=35)
-        # Using simplified risk options for these inputs
-        nationality_input = st.selectbox("Nationality Risk", options=risk_options, key="nationality_risk_pred")
-        residence_input = st.selectbox("Country of Residence Risk", options=risk_options, key="residence_risk_pred")
-        job_input = st.selectbox("Job Title Risk", options=risk_options, key="job_risk_pred")
+        nationality_input = st.selectbox("Nationality", options=nationality_options, key="nationality_pred")
+        residence_input = st.selectbox("Country of Residence", options=residence_options, key="residence_pred")
+        job_input = st.selectbox("Job Title", options=job_title_options, key="job_pred")
 
     with col_pred2:
         amount = st.number_input("Principal Loan Amount (SAR)", min_value=0.0, value=1000.0, step=100.0)
@@ -252,7 +362,6 @@ with tab2:
         income_bracket_input = st.selectbox("Income Bracket", options=income_bracket_options, key="income_bracket_pred")
         gender_input = st.selectbox("Gender", options=gender_options, key="gender_pred")
 
-    # Button to trigger prediction
     if st.button("Predict Delay"):
         prediction_result = predict_delay(
             age, nationality_input, residence_input, job_input, amount, apr,
@@ -260,10 +369,12 @@ with tab2:
         )
         st.write(prediction_result)
 
-# Instructions for running the Streamlit app:
+# Instructions for running the Streamlit app locally:
 # 1. Save the code above as a Python file (e.g., `app.py`).
-# 2. Make sure you have `streamlit`, `pandas`, `scikit-learn`, and `Pillow` installed:
-#    `pip install streamlit pandas scikit-learn Pillow`
+# 2. Save the `requirements.txt` file (as described at the top of this file) in the same directory.
 # 3. Place your `borrowers_data.csv`, `loans_data.csv`, `payments_data.csv`,
 #    and `random_forest_model.pkl` files in the same directory as `app.py`.
-# 4. Run the app from your terminal: `streamlit run app.py`
+# 4. Open your terminal or command prompt, navigate to this directory.
+# 5. Install dependencies: `pip install -r requirements.txt`
+# 6. Run the app: `streamlit run app.py`
+```
