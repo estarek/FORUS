@@ -284,7 +284,7 @@ st.set_page_config(page_title="Loan Management Dashboard", layout="wide")
 col1, col2 = st.columns([1, 3])
 with col1:
     # Placeholder for company logo. You can replace this with st.image("your_logo.png")
-    st.image("https://via.placeholder.com/100x100.png?text=Company+Logo", width=100)
+    st.image("https://www.forusinvest.com/wp-content/uploads/2019/03/logo-desktop.png", width=100)
 with col2:
     st.markdown("## Loan Management & Delay Prediction System")
 
