@@ -377,4 +377,3 @@ with tab2:
 # 4. Open your terminal or command prompt, navigate to this directory.
 # 5. Install dependencies: `pip install -r requirements.txt`
 # 6. Run the app: `streamlit run app.py`
-```
